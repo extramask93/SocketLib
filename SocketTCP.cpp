@@ -2,7 +2,9 @@
 #include "SocketTCP.h"
 #include <string>
 #include <Ws2tcpip.h>
-#include <sstream>
+
+#define CONNECT_REQUIRED {if(sock == INVALID_SOCKET) {throw SocketException{"Socket not connected, please connect before use."};}}
+
 SocketTCP::SocketTCP()
 {
 	const auto err = WSAStartup(MAKEWORD(2, 2), &this->wsa);
@@ -13,23 +15,21 @@ SocketTCP::SocketTCP()
 }
 
 SocketTCP::State SocketTCP::TCPConnect(const std::string& remoteAddress,
-	unsigned short remotePort, int timeout)
+	unsigned short remotePort, int timeout_)
 {
-	std::stringstream s;
-	s << remotePort;
 	struct addrinfo hints{};
 	struct addrinfo *result, *resultPointer;
-
+	timeout = timeout_;
 	hints.ai_family = PF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = 0;
 	hints.ai_protocol = 0;
 
 	const int errorCode =
-		getaddrinfo(remoteAddress.c_str(), s.str().c_str(), &hints, &result);
+		getaddrinfo(remoteAddress.c_str(), std::to_string(remotePort).c_str(), &hints, &result);
 	if (errorCode != 0)
 	{
-        throw SocketException(std::string("Error occurred during DNS resolving, system message: "));
+        throw SocketException(std::string("Error occurred during DNS resolving, code: ") + std::to_string(errorCode));
 	}
 
 	for (resultPointer = result; resultPointer != nullptr; resultPointer = resultPointer->ai_next)
@@ -54,21 +54,21 @@ SocketTCP::State SocketTCP::TCPConnect(const std::string& remoteAddress,
 			+ std::to_string(WSAGetLastError()));
 	}
 	::freeaddrinfo(result);
-	return state;
+	return State::Done;
 }
 
 SocketTCP::State SocketTCP::TCPSend(const char *data, int size) const
 {
+	CONNECT_REQUIRED;
 	int total = 0;
 	int bytesleft = size; 
-
+	int n = 0;
 	while (total < size) {
-		int n = send(sock, data + total, bytesleft, 0);
+		n = send(sock, data + total, bytesleft, 0);
 		if (n == -1) { throw SocketException{"Error while sending data to the remote host"}; }
 		total += n;
 		bytesleft -= n;
 	}
-
 	return State::Done;
 }
 
@@ -79,31 +79,29 @@ SocketTCP::State SocketTCP::TCPSendString(const std::string& s) const
 
 SocketTCP::State SocketTCP::TCPReceive(void * data, int size, int & received) const
 {
+	CONNECT_REQUIRED;
 	received = recv(sock, static_cast<char*>(data), size, 0);
 	return State::Done;
 }
 
 SocketTCP::State SocketTCP::TCPReceiveChar(char* c) const
 {
-	if (read(c, 1) > 0)
+	CONNECT_REQUIRED;
+	const auto bytes = read(c, 1);
+	if (bytes > 0)
 	{
 		return State::Done;
+	}
+	if(bytes == 0 )
+	{
+		return State::Disconnected;
 	}
 	return State::NotReady;
 }
 
-void SocketTCP::ReadAll(std::string& s) const
-{
-	char buff;
-	s.clear();
-	while(TCPReceiveChar(&buff) == State::Done)
-	{
-		s += buff;
-	}
-}
-
 size_t SocketTCP::read(char* buffer, int size) const
 {
+	CONNECT_REQUIRED;
 	int bytesRead = 0;
 	if (!isReadyToRead())
 	{
@@ -124,14 +122,14 @@ bool SocketTCP::isReadyToRead() const
 	struct timeval timeout {};
 	FD_ZERO(&recieveFd);
 	FD_SET(sock, &recieveFd);
-	timeout.tv_sec = 10;
+	timeout.tv_sec = this->timeout;
 	const int selectCode = select(static_cast<int>(sock + 1), &recieveFd, nullptr, nullptr, &timeout);
 	return selectCode > 0;
 
 }
 size_t SocketTCP::TCPReceiveUntil(std::string & line, const std::string & end) const
 {
-
+	CONNECT_REQUIRED;
 	char buffer;
 	size_t bytesRead = 0;
 	line.clear();
@@ -150,6 +148,7 @@ size_t SocketTCP::TCPReceiveUntil(std::string & line, const std::string & end) c
 
 SocketTCP::~SocketTCP()
 {
+	//no need for wsaclean, os will take care of it
 	closesocket(sock);
-	state = State::Disconnected;
+	sock = INVALID_SOCKET;
 }
