@@ -19,7 +19,7 @@ public:
 	/************************/
 	SocketTCP();
 	/*Blocking API*/
-	SocketTCP::State TCPConnect(const std::string& remoteAddress, unsigned short remotePort, int timeout = 0);
+	SocketTCP::State TCPConnect(const std::string& remoteAddress, unsigned short remotePort, int timeout = 5);
 	SocketTCP::State TCPSend(const char* data, int size) const;
 	SocketTCP::State TCPSendString(const std::string& s) const;
 	SocketTCP::State TCPReceive(void *data, int size, int &received) const;
