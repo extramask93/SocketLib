@@ -1,9 +1,9 @@
 #include "SocketException.h"
 #include "SocketTCP.h"
 #include <string>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #define CLOSE(sock) closesocket(sock)
-#include <Ws2tcpip.h>
+#include <ws2tcpip.h>
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -17,7 +17,7 @@
 
 SocketTCP::SocketTCP()
 {
-#ifdef _MSC_VER
+#ifdef _WIN32
 const auto err = WSAStartup(MAKEWORD(2, 2), &this->wsa);
 
 if(err != 0)

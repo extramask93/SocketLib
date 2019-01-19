@@ -1,6 +1,6 @@
 #pragma once
-#ifdef _MSC_VER
-#include <WinSock2.h>
+#ifdef _WIN32
+#include <winsock2.h>
 #else
 #define SOCKET int
 #define INVALID_SOCKET -1
@@ -38,7 +38,7 @@ public:
 	~SocketTCP();
 private:
 	int timeout = 5;
-#ifdef _MSC_VER
+#ifdef _WIN32
 	WSADATA wsa {};
 #endif
     SOCKET sock = INVALID_SOCKET;
