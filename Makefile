@@ -1,5 +1,5 @@
 all: SocketTCP.o main.o
-	g++ -std=c++17 SocketTCP.o main.o -o a.out
+	g++ -Wall -std=c++17 SocketTCP.o main.o -o a.out
 main.o:
 	g++ -Wall -c -std=c++17 main.cpp -o main.o
 SocketTCP.o:

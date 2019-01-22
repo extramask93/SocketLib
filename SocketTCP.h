@@ -16,7 +16,6 @@ public:
 	enum class State {
 		Done, NotReady, Disconnected
 	};
-	/*currently not supported TODO*/
 	enum class Mode
 	{
 		Listen, Connect
@@ -28,11 +27,16 @@ public:
 	SocketTCP::State TCPSend(const char* data, int size) const;
 	SocketTCP::State TCPSendString(const std::string& s) const;
     SocketTCP::State TCPReceive(void *data, int size, long &received) const;
+	size_t			 TCPReveiveN(std::string &s, size_t n);
 	SocketTCP::State TCPReceiveChar(char *c) const;
 	size_t			 TCPReceiveUntil(std::string& line, const std::string& end = "\r\n") const;
 	SocketTCP::State TCPListen(const std::string &addr, std::uint16_t port, int queue_len = 5);
 	std::unique_ptr<SocketTCP> TCPAccept();
 	/*Non blocking API*/
+	//TCPSendString_NB
+  	//TCPSendString_NB_continue
+  	//TCPReveiveN_NB()
+	//TCPReceiveUntil_NB()
 	/******TODO - no need for it currently*********/
 	SocketTCP(SocketTCP &socket) = delete;
 	SocketTCP& operator=(SocketTCP& sock) = delete;

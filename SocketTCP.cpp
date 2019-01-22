@@ -106,14 +106,14 @@ std::unique_ptr<SocketTCP>	SocketTCP::TCPAccept() {
 	SOCKET client = accept(sock,&peer_addr,&peer_addr_size);
 	return std::unique_ptr<SocketTCP>(new SocketTCP{client,mode,state,timeout});
 }
-size_t SocketTCP::TCPReveiveUtilClosed(std::string &buff)
+size_t SocketTCP::TCPReveiveN(std::string &s, size_t n)
 {
     CONNECT_REQUIRED;
     char buffer;
     size_t bytesRead = 0;
-    buff.clear();
-    while (TCPReceiveChar(&buffer) == State::Done) {
-        buff.push_back(buffer);
+    s.clear();
+    while (TCPReceiveChar(&buffer) == State::Done && bytesRead < n) {
+        s.push_back(buffer);
         ++bytesRead;
     }
     return bytesRead;
@@ -149,12 +149,15 @@ SocketTCP::State SocketTCP::TCPReceive(void * data, int size, long & received) c
 SocketTCP::State SocketTCP::TCPReceiveChar(char* c) const
 {
 	CONNECT_REQUIRED;
+	if(!isReadyToRead()) {
+		throw SocketException("Reception timed out");
+	}
 	const auto bytes = read(c, 1);
 	if (bytes > 0)
 	{
 		return State::Done;
 	}
-	if(bytes == 0 )
+	if(bytes == 0)
 	{
 		return State::Disconnected;
 	}
