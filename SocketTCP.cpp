@@ -15,7 +15,7 @@
 
 #define CONNECT_REQUIRED {if(sock == INVALID_SOCKET) {throw SocketException{"Socket not connected, please connect before use."};}}
 
-SocketTCP::SocketTCP()
+SocketTCP::SocketTCP(SocketTCP::Mode mode) : mode(mode)
 {
 #ifdef _WIN32
 const auto err = WSAStartup(MAKEWORD(2, 2), &this->wsa);
@@ -42,7 +42,7 @@ SocketTCP::State SocketTCP::TCPConnect(const std::string& remoteAddress,
 		getaddrinfo(remoteAddress.c_str(), std::to_string(remotePort).c_str(), &hints, &result);
 	if (errorCode != 0)
 	{
-        throw SocketException(std::string("Error occurred during DNS resolving, code: ") + std::to_string(errorCode));
+        throw SocketException(std::string("getaddrinfo: ") + gai_strerror(errorCode));
 	}
 
 	for (resultPointer = result; resultPointer != nullptr; resultPointer = resultPointer->ai_next)
@@ -63,13 +63,49 @@ SocketTCP::State SocketTCP::TCPConnect(const std::string& remoteAddress,
 
 	if (resultPointer == nullptr)
 	{
-		throw SocketException("Cannot establish connection to the server, error code: "
-            /*+ std::to_string(WSAGetLastError())*/);
+		throw SocketException("Cannot establish connection to the server, error code: ");
 	}
 	::freeaddrinfo(result);
     return State::Done;
 }
+SocketTCP::State SocketTCP::TCPListen(const std::string &addr, std::uint16_t port,int queue_len) {
+ 	struct addrinfo hints {};
+    struct addrinfo *result, *rp;
+    int s;
 
+    hints.ai_family = AF_INET;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+    hints.ai_flags = 0;    /* For wildcard IP address */
+    hints.ai_protocol = 0;          /* Any protocol */
+
+    s = getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &result);
+    if (s != 0) {
+	   throw SocketException(std::string("getaddrinfo: ") + gai_strerror(s));
+    }
+
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sock = socket(rp->ai_family, rp->ai_socktype,rp->ai_protocol);
+        if (sock == -1)
+            continue;
+        if (bind(sock, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;                  /* Success */
+        close(sock);
+    }
+    if (rp == NULL) {               /* No address succeeded */
+		   throw SocketException("Could not bind");
+    }
+    freeaddrinfo(result);           /* No longer needed */
+	if(listen(sock, queue_len) == -1) {
+		throw SocketException {"Listen failed"};
+	}
+	return State::Done;
+}
+std::unique_ptr<SocketTCP>	SocketTCP::TCPAccept() {
+	struct sockaddr peer_addr;
+    socklen_t peer_addr_size;
+	SOCKET client = accept(sock,&peer_addr,&peer_addr_size);
+	return std::unique_ptr<SocketTCP>(new SocketTCP{client,mode,state,timeout});
+}
 size_t SocketTCP::TCPReveiveUtilClosed(std::string &buff)
 {
     CONNECT_REQUIRED;
